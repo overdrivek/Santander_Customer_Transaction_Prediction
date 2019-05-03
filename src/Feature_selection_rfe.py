@@ -78,7 +78,8 @@ with tqdm.tqdm(total=max_features,desc='Feature selection ...') as timer:
         print('************************************************')
         print('Selecting top {} features'.format(num_features))
         # Run RF
-        classifier = RF_Classifier(n_estimators=total_num_features*num_features, verbose=2)
+        min_trees = 50
+        classifier = RF_Classifier(n_estimators=min_trees*num_features, verbose=2)
         #clf_rf.fit(x_train[mrmr_output], y_train)
         #classifier = svm.SVC(C=1.0,verbose=2)
         #clf_rf.fit(x_train[mrmr_output], y_train)
@@ -93,12 +94,13 @@ with tqdm.tqdm(total=max_features,desc='Feature selection ...') as timer:
         features_selected.append(feature_cols)
 
         print("Training with the selected number of features")
-        classifier_rf = RF_Classifier(n_estimators=5000,verbose=2)
-        x_train_selected = x_train[:,feature_cols]
-        x_test_selected = x_test[:,feature_cols]
+        min_trees = 50
+        classifier_rf = RF_Classifier(n_estimators=min_trees*num_features,verbose=2)
+        x_train_selected = np.asarray(x_train)[:,feature_cols]
+        x_test_selected = np.asarray(x_test)[:,feature_cols]
 
         print('Training ...')
-        classifier_rf.fit(x_test_selected,x_test_selected)
+        classifier_rf.fit(x_train_selected,y_train)
         y_train_pred = classifier_rf.predict(x_train_selected)
 
         y_test_pred = classifier_rf.predict(x_test_selected)
@@ -109,7 +111,7 @@ with tqdm.tqdm(total=max_features,desc='Feature selection ...') as timer:
         print('Training done...')
         print('Testing ...')
         # pristine output
-
+        df_pristine_query = np.asarray(df_pristine_dropped)[:,feature_cols]
         rf_predicted = classifier_rf.predict(df_pristine_query)
 
         df_output = pd.concat([df_pristine_file['ID_code'], pd.DataFrame(rf_predicted, columns=['target'])], axis=1)
@@ -121,9 +123,9 @@ with tqdm.tqdm(total=max_features,desc='Feature selection ...') as timer:
 
         mllogger.scalar('Train_errors',train_error,step=num_features)
         mllogger.scalar('Test_errors', test_error, step=num_features)
-        mllogger.text('Selected features are '+str(feature_cols),step=num_features)
-        mllogger.text('Train error'+str(train_error),step=num_features)
-        mllogger.text('Test error' + str(test_error), step=num_features)
+        mllogger.text('Selected_features','Selected features are '+str(feature_cols), step=num_features)
+        mllogger.text('Data','Train error'+str(train_error), step=num_features)
+        mllogger.text('Data','Test error' + str(test_error), step=num_features)
 
         timer.update()
 timer.close()
