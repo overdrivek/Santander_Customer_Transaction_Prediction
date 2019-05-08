@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 class evaluate_nn:
     def __init__(self,input_file=None,model=None):
         self.mldashboard_setup()
-        self.export_folder = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Model/forward_selected_fc/Result/')
+        self.export_folder = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Model/nn_pca_reducelr_BN/Result/')
         if os.path.exists(self.export_folder) is False:
             os.mkdir(self.export_folder)
         self.model_file = model
@@ -80,14 +80,15 @@ class evaluate_nn:
 class fc_net(BaseModel):
     def __init__(self):
         super(fc_net, self).__init__()
-        self.layer_1 = nn.Linear(200,256)
-        self.layer_2 = nn.Linear(256,128)
-        self.layer_3 = nn.Linear(128,2)
+        self.layer_1 = nn.Sequential(nn.Linear(50, 64), nn.BatchNorm1d(64), nn.ReLU())
+        self.layer_2 = nn.Sequential(nn.Linear(64, 128), nn.BatchNorm1d(128), nn.ReLU())
+        self.layer_3 = nn.Linear(128, 2)
+
 
     def forward(self, x):
         x = x.float()
-        x = F.relu(self.layer_1(x))
-        x = F.relu(self.layer_2(x))
+        x = self.layer_1(x)
+        x = self.layer_2(x)
         x = self.layer_3(x)
         return x
 
@@ -120,6 +121,6 @@ class csv_loader:
         return len(self.data)
 
 if __name__ == '__main__':
-    validation_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/test.csv')
-    model_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Model/forward_selected_fc/MODEL_EPOCH_40.pth')
+    validation_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/pca/test_pca.csv')
+    model_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Model/nn_pca_reducelr_BN/MODEL_EPOCH_120.pth')
     nn_trainer = evaluate_nn(input_file=validation_file,model=model_file)

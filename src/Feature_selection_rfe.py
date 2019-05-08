@@ -10,7 +10,8 @@ from matplotlib import pyplot as plt
 from mlxtend.feature_selection import SequentialFeatureSelector as sfs
 from sklearn.metrics import accuracy_score as acc
 import mldashboard
-import tqdm
+#import tqdm
+from tqdm import tqdm
 
 log_dir = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/log/')
 if os.path.exists(log_dir) is False:
@@ -26,10 +27,20 @@ test_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Custome
 df_train_file = pd.read_csv(train_file)
 df_pristine_file = pd.read_csv(test_file)
 
+unique_samples = []
+te_ = df_train_file.drop(['ID_code'],axis=1)
+unique_count = np.zeros_like(te_)
+for feature in tqdm(range(te_.shape[1])):
+    _, index_, count_ = np.unique(te_[:, feature], return_counts=True, return_index=True)
+    unique_count[index_[count_ == 1], feature] += 1
+
+
 print("get Training and test file")
 from sklearn.model_selection import train_test_split
 df_input = df_train_file.drop(['ID_code','target'],axis=1)
 df_target = df_train_file['target']
+
+
 #scaler = MinMaxScaler()
 #train_scaled = pd.DataFrame(scaler.fit_transform(df_input),columns=df_input.columns)
 train_scaled = df_input

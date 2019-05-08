@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 class train_nn:
     def __init__(self,input_file=None,validation_file=None,num_epochs=500):
         self.mldashboard_setup()
-        self.model_folder = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Model/forward_selected_fc')
+        self.model_folder = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Model/nn_pca_reducelr_BN/')
         if os.path.exists(self.model_folder) is False:
             os.mkdir(self.model_folder)
         self.input_file = input_file
@@ -24,22 +24,22 @@ class train_nn:
         self.num_epochs = num_epochs
         self.device = 'cuda:0'
         self.load_data()
-        self.create_model()
+        self.create_model(scheduler='ReduceLROnPlateau')
         self.train()
 
     def mldashboard_setup(self):
         log_dir = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/log/')
         if os.path.exists(log_dir) is False:
             os.mkdir(log_dir)
-        run_name = 'Santandar_Fully_connected'
+        run_name = 'Fully_connected_pca_std_BN_ReduceLR'
         self.mllogger = mldashboard.Logger()
         data_writer = mldashboard.JsonRecordFileWriter(log_dir, run_name, override=True)
         self.mllogger.add_writer(data_writer)
 
     def load_data(self):
-        # df_input = pd.read_csv(self.input_file)
-        # mean = np.asarray(df_input.drop(['ID_code'],axis=1).mean(axis=0))
-        # std = np.asarray(df_input.drop(['ID_code'],axis=1).std(axis=0))
+        #df_input = pd.read_csv(self.input_file)
+        #mean = np.asarray(df_input.drop(['ID_code'],axis=1).mean(axis=0))
+        #std = np.asarray(df_input.drop(['ID_code'],axis=1).std(axis=0))
 
         # data_transform = transforms.Compose([transforms.ToTensor(),transforms.Normalize(mean=mean, std=std)])
 
@@ -49,21 +49,33 @@ class train_nn:
         validation_set = csv_loader(self.validation_file)
         self.validation_load = data.DataLoader(validation_set, batch_size=1024, shuffle=True, drop_last=False)
 
-    def create_model(self,lr=0.0001,step_size=50):
+    def create_model(self,lr=0.1,step_size=10,momentum=0.95,weight_decay=0.0001,scheduler='StepLR',reducelronplateau_factor=0.1,reducelronplateau_patience=10):
         self.model = fc_net()
         self.model = self.model.to(self.device)
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(self.model.parameters(),lr=lr)
-        self.scheduler = lr_scheduler.StepLR(self.optimizer,step_size=step_size)
+        self.optimizer = optim.SGD(self.model.parameters(),lr=lr,momentum=momentum,weight_decay=weight_decay)
+        if scheduler == 'StepLR':
+            self.scheduler = lr_scheduler.StepLR(self.optimizer,step_size=step_size)
+        elif scheduler == 'ReduceLROnPlateau':
+            self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', verbose=True,
+                                                       factor=reducelronplateau_factor,
+                                                       patience=reducelronplateau_patience)
 
     def train(self):
         self.model.train()
         loss_log = []
 
+        test_loss = np.inf
+
         for epoch in range(self.num_epochs):
             with tqdm.tqdm(total=len(self.train_load), desc='Training...') as timer:
                 loss_meter = meters.AverageMeter()
                 accuracy_meter = meters.AverageMeter()
+                if self.scheduler == 'ReduceLROnPleateau':
+                    self.scheduler.step(test_loss)
+                else:
+                    self.scheduler.step(epoch)
+
                 for i,(input,label) in enumerate(self.train_load):
                     input = input.to(self.device)
                     label = label.to(self.device)
@@ -91,7 +103,7 @@ class train_nn:
             self.mllogger.scalar('Train Loss', train_loss, step=epoch)
             self.mllogger.scalar('Train Accuracy', train_accuracy, step=epoch)
 
-            self.validate(epoch=epoch)
+            test_loss,test_accuracy = self.validate(epoch=epoch)
             if epoch%40 == 0:
                 self.save_model(epoch=epoch)
                 #self.export_pristine(epoch=epoch)
@@ -140,18 +152,19 @@ class train_nn:
         self.mllogger.scalar('Test Loss', test_loss, step=epoch)
         self.mllogger.scalar('Test Accuracy', test_accuracy, step=epoch)
 
+        return test_loss, test_accuracy
 
 class fc_net(BaseModel):
     def __init__(self):
         super(fc_net, self).__init__()
-        self.layer_1 = nn.Linear(200,256)
-        self.layer_2 = nn.Linear(256,128)
+        self.layer_1 = nn.Sequential(nn.Linear(50,64),nn.BatchNorm1d(64),nn.ReLU())
+        self.layer_2 = nn.Sequential(nn.Linear(64,128),nn.BatchNorm1d(128),nn.ReLU())
         self.layer_3 = nn.Linear(128,2)
 
     def forward(self, x):
         x = x.float()
-        x = F.relu(self.layer_1(x))
-        x = F.relu(self.layer_2(x))
+        x = self.layer_1(x)
+        x = self.layer_2(x)
         x = self.layer_3(x)
         return x
 
@@ -176,6 +189,6 @@ class csv_loader:
         return len(self.data)
 
 if __name__ == '__main__':
-    input_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/training_files/train_set.csv')
-    validation_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/training_files/validation_set.csv')
+    input_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/pca/training_files/train_set.csv')
+    validation_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/pca/training_files/validation_set.csv')
     nn_trainer = train_nn(input_file,validation_file)
