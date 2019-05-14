@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-train_file = os.path.normpath('D:/PythonProjects/Santander_Customer_Transaction_Prediction/Data/train.csv')
+train_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/train.csv')
 
 df_train_file = pd.read_csv(train_file)
 
@@ -18,7 +18,7 @@ import  numpy as np
 #np_var = np.asarray(df_dropped_file['var_0'])
 #print(len(np.where(np.abs(np_var)< mean-1*std )[0]))
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler,Normalizer
 scaler = StandardScaler()
 df_dropped_file_scaled = scaler.fit_transform(np.asarray(df_dropped_file))
 
@@ -28,9 +28,9 @@ from sklearn.model_selection import train_test_split
 X_train,X_test,Y_train,Y_test = train_test_split(df_dropped_file_scaled,np.asarray(df_train_file['target']),test_size=test_size,shuffle=True,stratify=np.asarray(df_train_file['target']))
 
 print('training and validation files generated')
-run_mrmr = False
+run_mrmr = True
 selected_features = None
-num_features = 100
+num_features = 200
 if run_mrmr is True:
     import pymrmr
     mrmr_type = 'MIQ'
@@ -45,8 +45,10 @@ plot_output = True
 from sklearn.metrics import f1_score
 train_accuracies = []
 test_accuracies = []
+base_estimator = 'decTrees'
 if selected_features is not None: 
-    from sklearn.ensemble import AdaBoostClassifier as AdaBoost
+    from sklearn.ensemble import GradientBoostingClassifier as GradBoost
+    from sklearn.linear_model import SGDClassifier as SGD
     feature_list = []
     feature_name_list = []
     for feature in selected_features: 
@@ -57,7 +59,11 @@ if selected_features is not None:
         print('Number of features = ', len(feature_name_list))
         print('selected feature combination ',feature_name_list)
         x_selected = X_train[:,np.array(feature_list)]
-        classifier_mm = AdaBoost()
+        if base_estimator == 'sgd':
+            estimator = SGD(verbose=0,tol=1e-3,max_iter=1000,learning_rate='adaptive',eta0=0.1,warm_start=True)
+            classifier_mm = GradBoost(base_estimator=estimator, algorithm='SAMME')
+        else:
+            classifier_mm = GradBoost(n_estimators=500)
         classifier_mm.fit(x_selected,Y_train)
         train_output = classifier_mm.predict(x_selected)
         train_accuracy = f1_score(Y_train,train_output)
