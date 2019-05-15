@@ -69,8 +69,8 @@ verbose=True
 n_jobs=-1
 seed=27
 
-eval_metric = 'auc'
-cv_folds = 10
+eval_metric = 'error'
+cv_folds = 20
 early_stopping_rounds = 50
 
 gpu_res = {}  # Store accuracy result
