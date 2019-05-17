@@ -49,7 +49,7 @@ num_leaves = 50
 num_trees = 1000
 objective = 'binary'
 learning_rate = 0.1
-boosting = 'rf'#'gbdt'
+boosting = 'gbdt'
 num_iterations = 1000
 verbosity  = 1
 
