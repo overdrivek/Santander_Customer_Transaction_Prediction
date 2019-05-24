@@ -8,7 +8,7 @@ Created on Tue Feb 13 15:58:08 2018
 import pandas as pd
 import os
 
-train_file = '/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/train.csv'
+train_file = '/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/pca/train_pca.csv'
 
 #pd_train = pd.read_csv(train_file,sep=',',header=None)
 pd_train = pd.read_csv(train_file,sep=',')
@@ -20,7 +20,7 @@ label_train = pd_train['target']
 
 from sklearn.model_selection import train_test_split
 
-X_train,X_test,Y_train,Y_test = train_test_split(input_train,label_train,test_size=0.1,shuffle=True,stratify=label_train)
+X_train,X_test,Y_train,Y_test = train_test_split(input_train,label_train,test_size=0.05,shuffle=True,stratify=label_train)
 
 num_classes = 2
 import numpy as np

@@ -11,7 +11,7 @@ import  numpy as np
 import lightgbm_gpu as lgbm
 from sklearn.preprocessing import StandardScaler,Normalizer, RobustScaler
 from sklearn.metrics import confusion_matrix
-
+from sklearn.model_selection import GridSearchCV
 
 train_file = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Customer_Transaction_Prediction/Data/train.csv')
 df_train_file = pd.read_csv(train_file)
@@ -34,6 +34,7 @@ train_data = lgbm.Dataset(X_train,label=Y_train)
 valid_data = train_data.create_valid(X_test,label=Y_test)
 print('Training and validation data generated.')
 
+use_gridcv = True
 
 plot_output = True
 from sklearn.metrics import f1_score
@@ -45,14 +46,20 @@ useTrainCV = False
 num_rounds = 10
 cv_folds = 10
 eval_metric = 'binary_error'
-num_leaves = 50
+num_leaves = 100
 num_trees = 1000
 objective = 'binary'
 learning_rate = 0.1
-boosting = 'gbdt'
+boosting = 'dart'
 num_iterations = 1000
 verbosity  = 1
-
+boost_from_average = True
+max_depth = -1
+min_data_in_leaf = 20
+device_type ='gpu'
+bagging_freq = 20
+bagging_fraction = 0.2
+early_stopping_round = 10
 
 
 param = {'num_leaves': num_leaves,
@@ -62,15 +69,56 @@ param = {'num_leaves': num_leaves,
          'learning_rate':learning_rate,
          'boosting':boosting,
          'num_iterations':num_iterations,
-         'verbosity':verbosity
+         'verbosity':verbosity,
+         'boost_from_average': boost_from_average,
+         'max_depth': max_depth,
+         'min_data_in_leaf' : min_data_in_leaf,
+         'device_type': device_type,
+         'bagging_freq': bagging_freq,
+         'bagging_fraction': bagging_fraction,
+         'xgboost_dart_mode' : True,
+         'early_stopping_round': early_stopping_round,
+         'is_unbalance' : False
          }
+param_test1 = {}
+if use_gridcv is True:
+    param_test1 = {
+            #'max_depth': range(3, 10, 2),
+            #'min_child_weight': range(1, 6, 2),
+            #'gamma': [i / 10.0 for i in range(0, 5)]
+            'num_trees':[200,500,800,1000,5000],
+            'num_leaves':[31,50,100,200],
+            'boosting': ['gbrt','dart','rf'],
+            'max_depth': [-1,5,6,7,8,9],
+            'learning_rate': [0.3, 0.2, 0.1, 0.05, 0.01, 0.001]
+        }
 
 if useTrainCV:
     cv_results = lgbm.cv(param, train_data, num_rounds, nfold=cv_folds)
     lgbm_classifier = lgbm.train(param, train_data, num_rounds, valid_sets=[valid_data])
+    print('classifier parameters: ')
+    print(lgbm_classifier.params)
 else:
-    lgbm_classifier = lgbm.train(param,train_data,num_rounds,valid_sets=[valid_data])
-
+    if use_gridcv is True:
+        mdl = lgbm.LGBMClassifier(boosting_type=boosting,learning_rate=learning_rate,num_leaves=num_leaves, objective=objective, n_jobs=3,silent=False,num_trees=num_trees,metric=eval_metric,verbosity=verbosity)
+        grid = GridSearchCV(mdl,param_test1, n_jobs=4, cv=cv_folds, verbose=verbosity)
+        grid.fit(X_train,Y_train)
+        print('***********************************')
+        print('------------best params -------------')
+        print(grid.best_params_)
+        print('------------best score -------------')
+        print(grid.best_score_)
+        print('***********************************')
+        param['learning_rate'] = grid.best_params_['learning_rate']
+        param['num_trees'] = grid.best_params_['num_trees']
+        param['num_leaves'] = grid.best_params_['num_leaves']
+        param['boosting'] = grid.best_params_['boosting']
+        param['max_depth'] = grid.best_params_['max_depth']
+        #gsearch1 = GridSearchCV(estimator = lgbm.train(param,train_data,num_rounds,valid_sets=[valid_data]))
+        lgbm_classifier = lgbm.train(param, train_data, num_rounds, valid_sets=[valid_data])
+    else:
+        lgbm_classifier = lgbm.train(param,train_data,num_rounds,valid_sets=[valid_data])
+print(lgbm_classifier.params)
 train_output = np.round(lgbm_classifier.predict(X_train))
 test_output = np.round(lgbm_classifier.predict(X_test))
 
@@ -98,6 +146,8 @@ output_folder = os.path.normpath('/home/naraya01/AEN/GIT/Santander/Santander_Cus
 if os.path.exists(output_folder) is False:
     os.mkdir(output_folder)
 df_output.to_csv(os.path.join(output_folder,'pristine_result_.csv'),index=False)
+
+#kaggle competitions submit -c santander-customer-transaction-prediction -f submission.csv -m "Message"
 
 #
 #
